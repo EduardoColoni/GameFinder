@@ -1,6 +1,8 @@
 package com.faculdade.gamefinder.service;
 
+import com.faculdade.gamefinder.model.GameDetails;
 import com.faculdade.gamefinder.model.GameResponse;
+import com.faculdade.gamefinder.model.GameResponse.Game;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -14,12 +16,30 @@ public class RawgService {
     @Value("${rawg.api.key}")
     private String apiKey;
 
-    // Injeção via construtor (recomendado)
     public RawgService(WebClient.Builder webClientBuilder, @Value("${rawg.api.url}") String baseUrl) {
         this.webClient = webClientBuilder.baseUrl(baseUrl).build();
     }
 
-    public GameResponse.Game buscarJogo(String nome) {
+    public Game buscarJogo(String nome) {
+        // 1. PRIMEIRA CHAMADA: BUSCAR ID DO JOGO
+        Game game = buscarIdPeloNome(nome);
+
+        if (game == null) {
+            return null; // Jogo não encontrado na busca inicial
+        }
+
+        // 2. SEGUNDA CHAMADA: BUSCAR DETALHES PELO ID
+        GameDetails details = buscarDetalhesPeloId(game.getId());
+
+        if (details != null) {
+            // Combina os resultados
+            game.setDescription(details.getDescription_raw());
+        }
+
+        return game;
+    }
+
+    private Game buscarIdPeloNome(String nome) {
         try {
             GameResponse response = this.webClient.get()
                     .uri(uriBuilder -> uriBuilder
@@ -29,19 +49,33 @@ public class RawgService {
                             .build())
                     .retrieve()
                     .bodyToMono(GameResponse.class)
-                    .block(); // Bloqueia a chamada para funcionar como MVC tradicional
+                    .block();
 
             if (response != null && response.getResults() != null && !response.getResults().isEmpty()) {
-                // Retorna o primeiro da lista
-                return response.getResults().get(0);
+                return response.getResults().get(0); // Pega o primeiro resultado da busca
             }
             return null;
 
         } catch (WebClientResponseException e) {
-            System.err.println("Erro HTTP: " + e.getStatusCode());
+            System.err.println("Erro HTTP na busca: " + e.getStatusCode());
             return null;
-        } catch (Exception e) {
-            System.err.println("Erro genérico: " + e.getMessage());
+        }
+    }
+
+    private GameDetails buscarDetalhesPeloId(Long id) {
+        try {
+            // Endpoint: /api/games/{id}
+            return this.webClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path("games/{id}")
+                            .queryParam("key", apiKey)
+                            .build(id))
+                    .retrieve()
+                    .bodyToMono(GameDetails.class)
+                    .block();
+
+        } catch (WebClientResponseException e) {
+            System.err.println("Erro HTTP nos detalhes (ID: " + id + "): " + e.getStatusCode());
             return null;
         }
     }

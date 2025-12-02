@@ -23,13 +23,13 @@ public class GameController {
 
     @GetMapping("/search")
     public String search(@RequestParam String query, Model model) {
-        // Exibição dos dados consumidos [cite: 57]
+        // Exibição dos dados consumidos
         GameResponse.Game game = rawgService.buscarJogo(query);
 
         if (game != null) {
             model.addAttribute("game", game);
         } else {
-            // Tratamento de erro visual para o usuário
+            // Tratamento de erro visual
             model.addAttribute("error", "Jogo não encontrado ou erro de comunicação.");
         }
         return "index";

@@ -16,5 +16,6 @@ public class GameResponse {
         @JsonProperty("background_image")
         private String backgroundImage;
         private Double rating;
+        private String description;
     }
 }
